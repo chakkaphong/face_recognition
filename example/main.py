@@ -8,13 +8,20 @@ import cv2 as cv2
 import numpy as np
 import face_recognition
 
+eye_cascade = cv2.CascadeClassifier('haarcascade_eye.xml')
+face_cascade = cv2.CascadeClassifier('haarcascade_frontalface_default.xml')
+
+righ_eye_cascade = cv2.CascadeClassifier('haarcascade_righteye_2splits.xml')
+left_eye_cascade = cv2.CascadeClassifier('haarcascade_lefteye_2splits.xml')
+
 
 class MyApp(QMainWindow):
     def __init__(self, parent=None, camera_index=0, fps=30):
         super().__init__()
+        #init camera
         self.capture = cv2.VideoCapture(camera_index)
-        self.capture.set(cv2.CAP_PROP_FRAME_WIDTH, 511)
-        self.capture.set(cv2.CAP_PROP_FRAME_HEIGHT, 281)
+        self.capture.set(cv2.CAP_PROP_FRAME_WIDTH, 352)
+        self.capture.set(cv2.CAP_PROP_FRAME_HEIGHT, 240)
         self.dimensions = self.capture.read()[1].shape[1::-1]
         scene = QGraphicsScene(self)
         pixmap = QPixmap(*self.dimensions)
@@ -35,37 +42,41 @@ class MyApp(QMainWindow):
 
     def get_frame(self):
         _, frame = self.capture.read()
-        obama_image = face_recognition.load_image_file("../IMG/obama_1.jpg")
-        obama_face_encoding = face_recognition.face_encodings(obama_image)[0]
+        #face and eye detec
+        self.face_detection(frame)
+        #add camera to label
+        self.display_webcame(frame)
 
-        # Load a second sample picture and learn how to recognize it.
-        biden_image = face_recognition.load_image_file("../IMG/my_1.jpg")
-        biden_face_encoding = face_recognition.face_encodings(biden_image)[0]
+    def face_detection(self, frame):
+        gray = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
+        rgb = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
+        
+        faces = face_cascade.detectMultiScale(gray, 1.3, 5)
+        for (x,y,w,h) in faces:
+            cv2.rectangle(frame,(x,y),(x+w,y+h),(255,0,0),2)
+            roi_gray = gray[y:y+h, x:x+w]
+            roi_color = frame[y:y+h, x:x+w]
+            print("Coodinate(xy,wh): ",faces)
+            print("w: ",faces[0,2])
+            print("h: ",faces[0,3])
+            print("found face: ",len(faces))
+            eyes = eye_cascade.detectMultiScale(roi_gray)
+            Reye = righ_eye_cascade.detectMultiScale(roi_gray)
+            Leye = left_eye_cascade.detectMultiScale(roi_gray)
+            for (ex,ey,ew,eh) in Reye:
+                cv2.rectangle(roi_color,(ex,ey),(ex+ew,ey+eh),(0,255,0),2)
+            for (ex,ey,ew,eh) in Leye:
+                cv2.rectangle(roi_color,(ex,ey),(ex+ew,ey+eh),(0,255,0),2)
+            """\
+            for (ex,ey,ew,eh) in eyes:
+                if(len(faces) == 1 and len(eyes) == 2):
+                    cv2.imwrite('../IMG/captureimg4.jpg', cv2.cvtColor(rgb, cv2.COLOR_RGB2BGR))
+                cv2.rectangle(roi_color,(ex,ey),(ex+ew,ey+eh),(0,255,0),2)
+            """
 
-        # Create arrays of known face encodings and their names
-        known_face_encodings = [
-            obama_face_encoding,
-            biden_face_encoding
-        ]
-        known_face_names = [
-            "Barack Obama",
-            "Joe Biden"
-        ]
-        face_locations = face_recognition.face_locations(frame)
-        face_encodings = face_recognition.face_encodings(frame, face_locations)
-        for (top, right, bottom, left), face_encoding in zip(face_locations, face_encodings):
-            matches = face_recognition.compare_faces(known_face_encodings, face_encoding)
-            name = "Unknown"
-            face_distances = face_recognition.face_distance(known_face_encodings, face_encoding)
-            best_match_index = np.argmin(face_distances)
-            if matches[best_match_index]:
-                name = known_face_names[best_match_index]
-        cv2.rectangle(frame, (left, top), (right, bottom), (0, 0, 255), 2)
-        cv2.rectangle(frame, (left, bottom - 35), (right, bottom), (0, 0, 255), cv2.FILLED)
-        font = cv2.FONT_HERSHEY_DUPLEX
-        cv2.putText(frame, name, (left + 6, bottom - 6), font, 1.0, (255, 255, 255), 1)
 
-
+    def display_webcame(self, frame):
+        
         image = QImage(frame, *self.dimensions, QImage.Format_RGB888).rgbSwapped()
         pixmap = QPixmap.fromImage(image)
         self.pixmapItem.setPixmap(pixmap)
@@ -73,12 +84,16 @@ class MyApp(QMainWindow):
         lbl = QtWidgets.QLabel(self.ui.imgWidgetShow)
         lbl.setPixmap(pixmap)
         lbl.show()
-     
+
+
     def insertText(self):
         t = self.ui.label.text()
         #self.ui.lineEdit.setText("ยังโอมมอเทอฟักเกอร์")
         #self.setup_ui()
-        self.loadImage()
+        #self.loadImage()
+    def findFace(self):
+        print("ok")
+
     
     def loadImage(self):
         self.pam_image = face_recognition.load_image_file("../IMG/pam_1.jpg")
@@ -104,7 +119,6 @@ class MyApp(QMainWindow):
         print("Is the unknown face a picture of โอบาม่า? {}".format(results[1]))
         print("Is the unknown face a picture of น้าค่อม? {}".format(results[2]))
         print("Is the unknown face a new person that we've never seen before? {}".format(not True in results))
-        
         self.ui.lineEdit.setText("ยังโอมมอเทอฟักเกอร์ {}".format(results[1]))
 
 

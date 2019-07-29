@@ -8,7 +8,6 @@ import cv2 as cv2
 import numpy as np
 import face_recognition
 import threading
-import time
 
 eye_cascade = cv2.CascadeClassifier('haarcascade_eye.xml')
 face_cascade = cv2.CascadeClassifier('haarcascade_frontalface_default.xml')
@@ -33,17 +32,14 @@ class MyApp(QMainWindow):
         timer.setInterval(int(1000/fps))
         timer.timeout.connect(self.get_frame)
         timer.start()
-        #t = threading.Thread(target = self.loadImage, name = 'Thread1')
-        #t.start()
+
         #QWidget.__init__(self, parent)
         self.ui = Ui_MainWindow()
         self.ui.setupUi(self)
         # Events
         #>pyuic5 MywindowClass.ui > dialog.py
-        self.ui.pushButton.clicked.connect(self.getfile)
+        self.ui.pushButton.clicked.connect(self.insertText)
 
-    def print_number(self, num):
-        print(num)
 
     def get_frame(self):
         _, frame = self.capture.read()
@@ -51,6 +47,7 @@ class MyApp(QMainWindow):
         self.face_detection(frame)
         #add camera to label
         self.display_webcame(frame)
+  
 
     def face_detection(self, frame):
         gray = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
@@ -61,7 +58,6 @@ class MyApp(QMainWindow):
             cv2.rectangle(frame,(x,y),(x+w,y+h),(255,0,0),2)
             roi_gray = gray[y:y+h, x:x+w]
             roi_color = frame[y:y+h, x:x+w]
-            cv2.imshow("imgCrop", roi_gray)
             print("Coodinate(xy,wh): ",faces)
             print("w: ",faces[0,2])
             print("h: ",faces[0,3])
@@ -73,8 +69,8 @@ class MyApp(QMainWindow):
                 cv2.rectangle(roi_color,(ex,ey),(ex+ew,ey+eh),(0,255,0),2)
             for (ex,ey,ew,eh) in Leye:
                 cv2.rectangle(roi_color,(ex,ey),(ex+ew,ey+eh),(0,255,0),2)
-
-            """\
+              
+            """
             for (ex,ey,ew,eh) in eyes:
                 if(len(faces) == 1 and len(eyes) == 2):
                     cv2.imwrite('../IMG/captureimg4.jpg', cv2.cvtColor(rgb, cv2.COLOR_RGB2BGR))
@@ -90,18 +86,16 @@ class MyApp(QMainWindow):
         lbl = QtWidgets.QLabel(self.ui.imgWidgetShow)
         lbl.setPixmap(pixmap)
         lbl.show()
-    
-    def getfile(self):
-        fname = QFileDialog.getOpenFileName()
-        print(fname[0])
 
-   
 
     def insertText(self):
         t = self.ui.label.text()
-        #self.ui.lineEdit.setText("")
+        #self.ui.lineEdit.setText("ยังโอมมอเทอฟักเกอร์")
         #self.setup_ui()
         #self.loadImage()
+    def findFace(self):
+        print("ok")
+
     
     def loadImage(self):
         self.pam_image = face_recognition.load_image_file("../IMG/pam_1.jpg")

@@ -3,7 +3,7 @@
 -- https://www.phpmyadmin.net/
 --
 -- Host: localhost:3306
--- Generation Time: Aug 06, 2019 at 11:50 PM
+-- Generation Time: Aug 08, 2019 at 08:19 AM
 -- Server version: 5.7.24-log
 -- PHP Version: 7.2.10
 
@@ -55,7 +55,12 @@ INSERT INTO `tb_faces` (`face_id`, `face_fileName`, `face_name`, `employ_id`) VA
 (23, 'training12', 'rose', 457727),
 (24, 'training13', 'lidia', 457827),
 (25, 'training14', 'mary', 457927),
-(26, 'training15', 'slim Shady', 457027);
+(26, 'training15', 'slim Shady', 457027),
+(27, 'training16', 'PayutChanOcha', 457028),
+(28, 'training17', 'Putin', 457029),
+(29, 'training18', 'Nik', 457030),
+(30, 'training19', 'snoop', 457031),
+(31, 'training20', 'GusTeera', 457032);
 
 --
 -- Indexes for dumped tables

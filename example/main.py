@@ -11,7 +11,7 @@ import face_recognition
 import threading
 from multiprocessing import Process, current_process
 import mysql.connector
-from tqdm import tqdm
+from tqdm import tqdm, trange
 eye_cascade = cv2.CascadeClassifier('haarcascade_eye.xml')
 face_cascade = cv2.CascadeClassifier('haarcascade_frontalface_default.xml')
 
@@ -20,18 +20,24 @@ left_eye_cascade = cv2.CascadeClassifier('haarcascade_lefteye_2splits.xml')
 
 
 
-
 class MyApp(QMainWindow):
     def __init__(self, parent=None, camera_index=0, fps=30):
         super().__init__()
+        global state_capture         
+        state_capture = False
+        global arr_employid
+        self.arr_employid = None
         #init camera
         self.capture = cv2.VideoCapture(camera_index)
         self.capture.set(cv2.CAP_PROP_FRAME_WIDTH, 352)
         self.capture.set(cv2.CAP_PROP_FRAME_HEIGHT, 240)
         self.dimensions = self.capture.read()[1].shape[1::-1]
+        ''' Global id '''
+
+        
         ''' Connect Database'''
         global mydb
-        mydb = mysql.connector.connect(host="localhost", user="root", passwd="root", database="db_faces")
+        mydb = mysql.connector.connect(host="localhost", user="root", passwd="root", database="db_faces", port="8889")
         mycursor = mydb.cursor()
         mycursor.execute("SELECT * FROM tb_faces")
         global myresult
@@ -61,6 +67,7 @@ class MyApp(QMainWindow):
     def get_frame(self):
         _, frame = self.capture.read()
         #face and eye detec
+
         self.face_detection(frame)
         #add camera to label
         self.display_webcame(frame)
@@ -73,16 +80,35 @@ class MyApp(QMainWindow):
         known_face_names = []
         global state_process
         state_process = False
-        for x in tqdm(myresult):
+        
+
+        gen = tqdm(myresult)
+        self.ui.progressBar.setValue(0)
+        for x in gen:
+            tqdm.write(str(x))
+            #print(gen.n)
+            
+            per = (gen.n / (len(gen) - 1))*100
+            #self.updateProgressbar(per)
+            
+            #for current_buffer in x:
+                #print(current_buffer)
             filepath = '../training/{}.jpg'.format(x[1])
             load_img = face_recognition.load_image_file(filepath)
             load_img_encoding = face_recognition.face_encodings(load_img)[0]
             known_face_encodings.append(load_img_encoding)
             known_face_names.append(x[2])
-        print(known_face_encodings)
-        print(known_face_names)
+
+            #print(percen)
+        #print(known_face_encodings)
+        #print(known_face_names)
         state_process = True
 
+    def updateProgressbar(self, n):
+        con = int(n)
+        print(con)
+        if con >= 50:
+            self.ui.progressBar.setValue(50)
 
     def face_detection(self, frame):
         gray = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
@@ -111,9 +137,14 @@ class MyApp(QMainWindow):
                     matches = face_recognition.compare_faces(known_face_encodings, face_encoding)
                     results = face_recognition.face_distance(known_face_encodings, face_encoding)
                     best_match_index = np.argmin(results)
+                    print(results)
                     if matches[best_match_index]:
-                        name = known_face_names[best_match_index]
-                        print(name)
+                        if (self.arr_employid == known_face_names[best_match_index]):
+                            print("Face is handsome")
+
+                        else:
+                            Em_id = known_face_names[best_match_index]
+                            self.GetEmpolyInfo(int(Em_id))
 
 
             """
@@ -122,6 +153,18 @@ class MyApp(QMainWindow):
                     cv2.imwrite('../IMG/captureimg4.jpg', cv2.cvtColor(rgb, cv2.COLOR_RGB2BGR))
                 cv2.rectangle(roi_color,(ex,ey),(ex+ew,ey+eh),(0,255,0),2)
             """
+
+    def GetEmpolyInfo(self, Em_id):
+        self.arr_employid = Em_id
+        print(self.arr_employid)
+        mycursor = mydb.cursor()
+        sql = "SELECT * FROM tb_employ WHERE employ_id = {}".format(Em_id)
+        mycursor.execute(sql)
+        res = mycursor.fetchall()
+        ex_res = res[0]
+        self.ui.line_name.setText(ex_res[1])
+        self.ui.line_lname.setText(ex_res[2])
+
 
     def square(number):
         """The function squares whatever number it is provided."""
@@ -152,9 +195,10 @@ class MyApp(QMainWindow):
 
     def insertText(self):
         t = self.ui.label.text()
-        #self.ui.lineEdit.setText("ยังโอมมอเทอฟักเกอร์")
+        #self.ui.lineEdit.setText("")
         #self.setup_ui()
         #self.loadImage()
+
     def findFace(self):
         print("ok")
 

@@ -12,6 +12,8 @@ import threading
 from multiprocessing import Process, current_process
 import mysql.connector
 from tqdm import tqdm, trange
+import pickle
+
 eye_cascade = cv2.CascadeClassifier('haarcascade_eye.xml')
 face_cascade = cv2.CascadeClassifier('haarcascade_frontalface_default.xml')
 
@@ -37,9 +39,9 @@ class MyApp(QMainWindow):
         
         ''' Connect Database'''
         global mydb
-        mydb = mysql.connector.connect(host="localhost", user="root", passwd="root", database="db_faces", port="8889")
+        mydb = mysql.connector.connect(host="localhost", user="root", passwd="root", database="db_faces", port="3306")
         mycursor = mydb.cursor()
-        mycursor.execute("SELECT * FROM tb_faces")
+        mycursor.execute("SELECT * FROM tb_bio_face")
         global myresult
         myresult  = mycursor.fetchall()
 
@@ -82,26 +84,10 @@ class MyApp(QMainWindow):
         state_process = False
         
 
-        gen = tqdm(myresult)
-        self.ui.progressBar.setValue(0)
-        for x in gen:
-            tqdm.write(str(x))
-            #print(gen.n)
-            
-            per = (gen.n / (len(gen) - 1))*100
-            #self.updateProgressbar(per)
-            
-            #for current_buffer in x:
-                #print(current_buffer)
-            filepath = '../training/{}.jpg'.format(x[1])
-            load_img = face_recognition.load_image_file(filepath)
-            load_img_encoding = face_recognition.face_encodings(load_img)[0]
-            known_face_encodings.append(load_img_encoding)
-            known_face_names.append(x[2])
-
-            #print(percen)
-        #print(known_face_encodings)
-        #print(known_face_names)
+        pathKnownImg = "encodings.pickle"
+        data = pickle.loads(open(pathKnownImg, "rb").read())
+        known_face_encodings = data["encodings"]
+        known_face_names = data["names"]
         state_process = True
 
     def updateProgressbar(self, n):
@@ -133,20 +119,46 @@ class MyApp(QMainWindow):
             if(state_process == True):
                 face_locations = face_recognition.face_locations(rgb)
                 face_encodings = face_recognition.face_encodings(rgb, face_locations)
+                print('location: {}'.format(face_locations))
+                #cv2.imshow('ssss',face_encodings)
+                #if len(face_locations) == 1:
+                for (x,y,w,h) in face_locations:
+                    print(face_locations[0])
+                    if len(face_locations) > 1:
+                        print(face_locations[1])
+                    print('first face x position: {}'.format(x))
+                    print('first face y position: {}'.format(y))
+                    print('first face w scale: {}'.format(w))
+                    print('first face h scale: {}'.format(h))
+                    print('----------')
+                   
+                   
+            
+
                 for (top, right, bottom, left), face_encoding in zip(face_locations, face_encodings):
-                    matches = face_recognition.compare_faces(known_face_encodings, face_encoding)
+                    matches = face_recognition.compare_faces(known_face_encodings, face_encoding, 0.35)
                     results = face_recognition.face_distance(known_face_encodings, face_encoding)
-                    best_match_index = np.argmin(results)
-                    print(results)
+                    #name = "Unknown"
+
+                    if True in matches:
+                        matchedIdxs = [i for (i,b) in enumerate(matches) if b]
+                        counts = {}
+                        for i in matchedIdxs:
+                            name = known_face_names[i]
+                            counts[name] = counts.get(name, 0) + 1
+                        name = max(counts, key=counts.get)
+                        print(name)
+                    """
                     if matches[best_match_index]:
                         if (self.arr_employid == known_face_names[best_match_index]):
                             print("Face is handsome")
 
                         else:
                             Em_id = known_face_names[best_match_index]
-                            self.GetEmpolyInfo(int(Em_id))
+                            #self.GetEmpolyInfo(int(Em_id))
+                    """
 
-
+            
             """
             for (ex,ey,ew,eh) in eyes:
                 if(len(faces) == 1 and len(eyes) == 2):

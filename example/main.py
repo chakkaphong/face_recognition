@@ -13,6 +13,8 @@ from multiprocessing import Process, current_process
 import mysql.connector
 from tqdm import tqdm, trange
 import pickle
+import datetime 
+from sklearn import svm
 
 eye_cascade = cv2.CascadeClassifier('haarcascade_eye.xml')
 face_cascade = cv2.CascadeClassifier('haarcascade_frontalface_default.xml')
@@ -39,11 +41,9 @@ class MyApp(QMainWindow):
         
         ''' Connect Database'''
         global mydb
-        mydb = mysql.connector.connect(host="localhost", user="root", passwd="root", database="db_faces", port="3306")
-        mycursor = mydb.cursor()
-        mycursor.execute("SELECT * FROM tb_bio_face")
-        global myresult
-        myresult  = mycursor.fetchall()
+        mydb = mysql.connector.connect(host="localhost", user="root", passwd="root", database="db_nrod", port="3306")
+        
+ 
 
         '''multi Threading'''
         t1 = threading.Thread(target = self.loadImage , args = ())
@@ -74,7 +74,6 @@ class MyApp(QMainWindow):
         #add camera to label
         self.display_webcame(frame)
 
-  
     def loadImage(self):
         global known_face_encodings 
         known_face_encodings = []
@@ -82,13 +81,24 @@ class MyApp(QMainWindow):
         known_face_names = []
         global state_process
         state_process = False
-        
+
+
 
         pathKnownImg = "encodings.pickle"
         data = pickle.loads(open(pathKnownImg, "rb").read())
         known_face_encodings = data["encodings"]
         known_face_names = data["names"]
+    
+        #clf = svm.SVC(gamma='scale')
+        #clf.fit(known_face_encodings,known_face_names)
         state_process = True
+
+
+    #Machine Leaing wiht SVM
+    def learnImage(self):
+        clf = svm.SVC(gamma='scale')
+        clf.fit(encodings,names)
+        
 
     def updateProgressbar(self, n):
         con = int(n)
@@ -97,108 +107,88 @@ class MyApp(QMainWindow):
             self.ui.progressBar.setValue(50)
 
     def face_detection(self, frame):
-        gray = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
         rgb = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
-        faces = face_cascade.detectMultiScale(gray, 1.3, 5)
-        for (x,y,w,h) in faces:
-            cv2.rectangle(frame,(x,y),(x+w,y+h),(255,0,0),2)
-            roi_gray = gray[y:y+h, x:x+w]
-            roi_color = frame[y:y+h, x:x+w]
-            #print("Coodinate(xy,wh): ",faces)
-            #print("w: ",faces[0,2])
-            #print("h: ",faces[0,3])
-            #print("found face: ",len(faces))
-            eyes = eye_cascade.detectMultiScale(roi_gray)
-            Reye = righ_eye_cascade.detectMultiScale(roi_gray)
-            Leye = left_eye_cascade.detectMultiScale(roi_gray)
-            for (ex,ey,ew,eh) in Reye:
-                cv2.rectangle(roi_color,(ex,ey),(ex+ew,ey+eh),(0,255,0),2)
-            for (ex,ey,ew,eh) in Leye:
-                cv2.rectangle(roi_color,(ex,ey),(ex+ew,ey+eh),(0,255,0),2)
-
-            if(state_process == True):
-                face_locations = face_recognition.face_locations(rgb)
+        if(state_process == True):
+            face_locations = face_recognition.face_locations(rgb)
+            temp = 0
+            best_index = 0
+            #cv2.imshow('ssss',face_encodings)
+            if len(face_locations) == 1:
                 face_encodings = face_recognition.face_encodings(rgb, face_locations)
-                print('location: {}'.format(face_locations))
-                #cv2.imshow('ssss',face_encodings)
-                #if len(face_locations) == 1:
-                for (x,y,w,h) in face_locations:
-                    print(face_locations[0])
-                    if len(face_locations) > 1:
-                        print(face_locations[1])
-                    print('first face x position: {}'.format(x))
-                    print('first face y position: {}'.format(y))
-                    print('first face w scale: {}'.format(w))
-                    print('first face h scale: {}'.format(h))
-                    print('----------')
-                   
-                   
-            
+            elif len(face_locations) >= 2:
+                for i in range(len(face_locations)):
+                    sum_of_face = face_locations[i][0] + face_locations[i][1] + face_locations[i][2] + face_locations[i][3]
+                    #print('round:{} | sum:{}'.format(i, sum_of_face))
+                    if sum_of_face > temp:
+                        temp = sum_of_face
+                        best_index = i
+                #print(best_index)
+                face_encodings = face_recognition.face_encodings(rgb, [face_locations[best_index]])
+                temp = 0
+                best_index = 0   
+        try:
+            for (top, right, bottom, left), face_encoding in zip(face_locations, face_encodings):
+                #pre_name = clf.predict(face_encoding)
+                #print('Pre:{}'.format(pre_name))
 
-                for (top, right, bottom, left), face_encoding in zip(face_locations, face_encodings):
-                    matches = face_recognition.compare_faces(known_face_encodings, face_encoding, 0.35)
-                    results = face_recognition.face_distance(known_face_encodings, face_encoding)
-                    #name = "Unknown"
-
-                    if True in matches:
-                        matchedIdxs = [i for (i,b) in enumerate(matches) if b]
-                        counts = {}
-                        for i in matchedIdxs:
-                            name = known_face_names[i]
-                            counts[name] = counts.get(name, 0) + 1
+                matches = face_recognition.compare_faces(known_face_encodings, face_encoding, 0.38)
+                results = face_recognition.face_distance(known_face_encodings, face_encoding)
+                print('{}'.format(face_locations))
+                #print('Matching per: {}'.format(results))
+                face_image = frame[top:bottom, left:right]
+                cv2.imshow('hog',face_image)
+                #name = "Unknown"
+                if True in matches:
+                    matchedIdxs = [i for (i,b) in enumerate(matches) if b]
+                    counts = {}
+                    for i in matchedIdxs:
+                        name = known_face_names[i]
+                        counts[name] = counts.get(name, 0) + 1
                         name = max(counts, key=counts.get)
-                        print(name)
-                    """
-                    if matches[best_match_index]:
-                        if (self.arr_employid == known_face_names[best_match_index]):
-                            print("Face is handsome")
+                        #print(name)
+                        id_spilt = name.split("_")
+                        person_id = id_spilt[0]
+                        self.GetEmpolyInfo(person_id)
+                        self.checkName(person_id)        
+                        #mycursor.execute("SELECT * FROM  tb_meeting_room WHERE meet_empID = {}".format(person_id))
+                        #res = mycursor.fetchall()  
+                        #print('Res:{}', res) 
+                                
+                   
+                        
 
-                        else:
-                            Em_id = known_face_names[best_match_index]
-                            #self.GetEmpolyInfo(int(Em_id))
-                    """
-
-            
-            """
-            for (ex,ey,ew,eh) in eyes:
-                if(len(faces) == 1 and len(eyes) == 2):
-                    cv2.imwrite('../IMG/captureimg4.jpg', cv2.cvtColor(rgb, cv2.COLOR_RGB2BGR))
-                cv2.rectangle(roi_color,(ex,ey),(ex+ew,ey+eh),(0,255,0),2)
-            """
-
-    def GetEmpolyInfo(self, Em_id):
-        self.arr_employid = Em_id
-        print(self.arr_employid)
+        except:
+            print("Can't Found face in came")
+    
+    def checkName(self, person_id):
+        a = (datetime.datetime.now()).strftime("%Y-%m-%d %H:%M:%S")
         mycursor = mydb.cursor()
-        sql = "SELECT * FROM tb_employ WHERE employ_id = {}".format(Em_id)
+        sql = "INSERT INTO tb_meeting_room (meet_id, meet_empID, meet_empTime) VALUES ({}, {}, '{}')".format(2, person_id, a)
         mycursor.execute(sql)
-        res = mycursor.fetchall()
-        ex_res = res[0]
-        self.ui.line_name.setText(ex_res[1])
-        self.ui.line_lname.setText(ex_res[2])
+        mydb.commit()
 
 
-    def square(number):
-        """The function squares whatever number it is provided."""
-        unknow_img = face_recognition.load_image_file('../IMG/rapgod.jpg')
-        unkow_ing_encoding = face_recognition.face_encodings(unknow_img)[0]
-
-        for i in range(20):
-            filepath = '../training/training{}.jpg'.format(number)
-            load_img = face_recognition.load_image_file(filepath)
-            load_img_encoding = face_recognition.face_encodings(load_img)[0]
-            number+=1
-            results = face_recognition.face_distance([load_img_encoding], unkow_ing_encoding)
-            proc_id = os.getpid()
-            process_name = current_process().name
-            print(str(results) + str( proc_id) + str( process_name) + 'matching image: {}'.format(number-1))
+    def GetEmpolyInfo(self, person_id):
+        mycursor = mydb.cursor()
+        mycursor.execute("SELECT * FROM  nrod_emp WHERE emp_id = {}".format(person_id))
+        global myresult
+        myresult  = mycursor.fetchall()
+        print(myresult)
+        Spiltshot = myresult[0][2].split(" ")
+        name_spilt = Spiltshot[0]
+        lname_spilt = Spiltshot[1]
+        self.ui.line_num.setText(myresult[0][1])
+        self.ui.line_name.setText(name_spilt)
+        self.ui.line_lname.setText(lname_spilt)
+        self.ui.line_position.setText(myresult[0][4])
+        self.ui.line_under.setText(myresult[0][5])
 
 
     def display_webcame(self, frame):
-        
         image = QImage(frame, *self.dimensions, QImage.Format_RGB888).rgbSwapped()
         pixmap = QPixmap.fromImage(image)
         self.pixmapItem.setPixmap(pixmap)
+
 
         lbl = QtWidgets.QLabel(self.ui.imgWidgetShow)
         lbl.setPixmap(pixmap)
@@ -211,8 +201,6 @@ class MyApp(QMainWindow):
         #self.setup_ui()
         #self.loadImage()
 
-    def findFace(self):
-        print("ok")
 
     def setup_ui(self):   
         src = cv2.imread('../IMG/my_1.jpg')
